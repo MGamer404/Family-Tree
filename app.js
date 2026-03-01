@@ -634,6 +634,10 @@ function finishDrawLine(mx, my) {
 }
 
 // ======================== PAN & ZOOM ========================
+let activePointers = new Map();
+let initialPinchDistance = 0;
+let initialPinchZoom = 1;
+
 function setupCanvasInteraction() {
     const wrapper = document.getElementById('canvas-wrapper');
 
