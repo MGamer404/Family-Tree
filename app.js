@@ -64,7 +64,7 @@ const TRANSLATIONS = {
     }
 };
 
-let currentLang = localStorage.getItem('lineage_lang') || 'en';
+let currentLang = localStorage.getItem('lineage_lang') || 'ar';
 
 function t(key, ...args) {
     const val = TRANSLATIONS[currentLang][key];
