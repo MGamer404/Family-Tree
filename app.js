@@ -5,7 +5,7 @@
 // ======================== TRANSLATIONS ========================
 const TRANSLATIONS = {
     en: {
-        newTree: 'New Tree', addPerson: 'Add Person', share: 'Share', exportPdf: 'Export PDF',
+        newTree: 'New Tree', addPerson: 'Add Person', share: 'Share',
         yourTrees: 'Your Family Trees',
         dashSub: 'Select a tree to continue, or create a new one.',
         open: 'Open', delete: 'Delete',
@@ -23,8 +23,6 @@ const TRANSLATIONS = {
         cardColor: 'Card Color', addToTree: 'Add to Tree', saveChanges: 'Save Changes',
         enterName: 'Please enter a name.', enterTreeName: 'Please enter a tree name.',
         shareCopied: 'Share link copied to clipboard!',
-        nothingToExport: 'Nothing to export — add some people first.',
-        allowPopups: '⚠️ Allow pop-ups in your browser to export PDF.',
         importFailed: 'Failed to import shared tree.',
         deleteConfirm: (name) => `Delete "${name}"? This cannot be undone.`,
         imported: (name) => `Imported "${name}"!`,
@@ -36,7 +34,7 @@ const TRANSLATIONS = {
         copyLink: 'Copy Link'
     },
     ar: {
-        newTree: 'شجرة جديدة', addPerson: 'إضافة شخص', share: 'مشاركة', exportPdf: 'تصدير PDF',
+        newTree: 'شجرة جديدة', addPerson: 'إضافة شخص', share: 'مشاركة',
         yourTrees: 'أشجار عائلتك',
         dashSub: 'اختر شجرة للمتابعة، أو أنشئ شجرة جديدة.',
         open: 'فتح', delete: 'حذف',
@@ -54,8 +52,6 @@ const TRANSLATIONS = {
         cardColor: 'لون البطاقة', addToTree: 'إضافة للشجرة', saveChanges: 'حفظ التغييرات',
         enterName: 'يرجى إدخال اسم.', enterTreeName: 'يرجى إدخال اسم الشجرة.',
         shareCopied: 'تم نسخ رابط المشاركة!',
-        nothingToExport: 'لا يوجد شيء للتصدير — أضف أشخاصاً أولاً.',
-        allowPopups: '⚠️ اسمح بالنوافذ المنبثقة في متصفحك لتصدير PDF.',
         importFailed: 'فشل استيراد الشجرة المشتركة.',
         deleteConfirm: (name) => `هل تريد حذف "${name}"؟ لا يمكن التراجع عن هذا!`,
         imported: (name) => `تم استيراد "${name}"!`,
@@ -867,90 +863,6 @@ document.getElementById('btn-share-copy').addEventListener('click', () => {
     closeModal('modal-share');
 });
 
-// ======================== PDF EXPORT ========================
-document.getElementById('btn-export-pdf').addEventListener('click', () => {
-    deselectAll();
-    const ns = Object.values(nodes);
-    if (!ns.length) { showToast(t('nothingToExport')); return; }
-
-    // Compute bounding box of all nodes
-    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-    ns.forEach(n => {
-        minX = Math.min(minX, n.x); minY = Math.min(minY, n.y);
-        maxX = Math.max(maxX, n.x + n.w); maxY = Math.max(maxY, n.y + n.h);
-    });
-    const pad = 48;
-    const W = maxX - minX + pad * 2;
-    const H = maxY - minY + pad * 2;
-
-    // Build SVG connection paths, offset by bounding box origin
-    const svgPaths = Object.values(lines).map(l => {
-        const p1 = anchorCenter(l.fromNode, l.fromAnchor);
-        const p2 = anchorCenter(l.toNode, l.toAnchor);
-        const ox = -minX + pad, oy = -minY + pad;
-        const d = orthogonalPath(p1.x + ox, p1.y + oy, l.fromAnchor, p2.x + ox, p2.y + oy, l.toAnchor);
-        return `<path d="${d}" fill="none" stroke="#6c63ff" stroke-width="2.2"
-                    stroke-linecap="round" stroke-linejoin="round"/>`;
-    }).join('\n');
-
-    // Build node HTML, repositioned to local coords
-    const nodesHtml = ns.map(n => {
-        const lx = n.x - minX + pad;
-        const ly = n.y - minY + pad;
-        const dodStr = n.dod ? n.dod : t('now');
-        const nameSz = Math.round(n.w * 0.16);
-        const dateSz = Math.round(n.w * 0.08);
-        return `<div style="
-            position:absolute;left:${lx}px;top:${ly}px;
-            width:${n.w}px;height:${n.h}px;
-            border-radius:14px;background:${gradient(n.gradient)};
-            display:flex;flex-direction:column;
-            align-items:center;justify-content:center;
-            padding:16px 12px;gap:6px;
-            box-shadow:0 4px 20px rgba(108,99,255,.2);">
-          <div style="font-size:${nameSz}px;font-weight:700;color:rgba(255,255,255,.97);
-                      text-align:center;line-height:1.2;word-break:break-word;">${esc(n.name)}</div>
-          <div style="font-size:${dateSz}px;color:rgba(255,255,255,.82);
-                      text-align:center;word-break:break-word;">${esc(n.dob || '?')} – ${esc(dodStr)}</div>
-        </div>`;
-    }).join('\n');
-
-    const treeName = trees[currentTreeId]?.name || 'Family Tree';
-    const html = `<!DOCTYPE html>
-<html><head>
-  <meta charset="UTF-8">
-  <title>${esc(treeName)}</title>
-  <style>
-    *{box-sizing:border-box;margin:0;padding:0;}
-    body{font-family:Arial,sans-serif;background:#f8f7ff;padding:20px;}
-    h1{font-size:18px;margin-bottom:16px;color:#1e1b4b;}
-    .canvas{position:relative;width:${W}px;height:${H}px;}
-    @media print{
-      body{padding:0;}
-      h1{font-size:14px;margin-bottom:10px;}
-      @page{size:landscape;margin:12mm;}
-    }
-  </style>
-</head><body>
-  <h1>🌳 ${esc(treeName)}</h1>
-  <div class="canvas">
-    <svg style="position:absolute;top:0;left:0;overflow:visible;"
-         width="${W}" height="${H}">${svgPaths}</svg>
-    ${nodesHtml}
-  </div>
-  <script>
-    window.addEventListener('load', function() {
-      setTimeout(function(){ window.print(); }, 300);
-    });
-    window.addEventListener('afterprint', function(){ window.close(); });
-  <\/script>
-</body></html>`;
-
-    const win = window.open('', '_blank', `width=${Math.min(W + 80, 1400)},height=${Math.min(H + 140, 900)}`);
-    if (!win) { showToast(t('allowPopups')); return; }
-    win.document.write(html);
-    win.document.close();
-});
 
 // ======================== SHARE IMPORT ON LOAD ========================
 function checkShareImport() {
