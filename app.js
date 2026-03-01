@@ -8,11 +8,13 @@ const TRANSLATIONS = {
         newTree: 'New Tree', addPerson: 'Add Person', share: 'Share',
         yourTrees: 'Your Family Trees',
         dashSub: 'Select a tree to continue, or create a new one.',
-        open: 'Open', delete: 'Delete',
+        open: 'Open', delete: 'Delete', rename: 'Rename',
         noTrees: 'No trees yet. Create your first one!',
         member: 'member', members: 'members', connection: 'connection', connections: 'connections',
         createNewTree: 'Create New Tree',
         createNewTreeSub: 'Give your family tree a name to get started.',
+        renameTree: 'Rename Tree',
+        renameTreeSub: 'Enter a new name for your family tree.',
         treeNamePlaceholder: 'e.g. The Johnson Family',
         cancel: 'Cancel', create: 'Create',
         addFamilyMember: 'Add Family Member', editFamilyMember: 'Edit Family Member',
@@ -37,11 +39,13 @@ const TRANSLATIONS = {
         newTree: 'شجرة جديدة', addPerson: 'إضافة شخص', share: 'مشاركة',
         yourTrees: 'أشجار عائلتك',
         dashSub: 'اختر شجرة للمتابعة، أو أنشئ شجرة جديدة.',
-        open: 'فتح', delete: 'حذف',
+        open: 'فتح', delete: 'حذف', rename: 'إعادة تسمية',
         noTrees: 'لا توجد أشجار بعد. أنشئ أولى شجرة!',
         member: 'عضو', members: 'أعضاء', connection: 'اتصال', connections: 'اتصالات',
         createNewTree: 'إنشاء شجرة جديدة',
         createNewTreeSub: 'أعطِ شجرة عائلتك اسماً للبدء.',
+        renameTree: 'إعادة تسمية الشجرة',
+        renameTreeSub: 'أدخل اسماً جديداً لشجرة العائلة.',
         treeNamePlaceholder: 'مثال: عائلة الجونسون',
         cancel: 'إلغاء', create: 'إنشاء',
         addFamilyMember: 'إضافة فرد من العائلة', editFamilyMember: 'تعديل بيانات الفرد',
@@ -212,9 +216,11 @@ function renderDashboard() {
       <div class="tree-card-meta">${memberStr}  •  ${connStr}</div>
       <div class="tree-card-actions">
         <button class="btn-primary small open-btn">${t('open')}</button>
+        <button class="btn-outline small rename-btn">${t('rename')}</button>
         <button class="btn-danger del-btn">${t('delete')}</button>
       </div>`;
         card.querySelector('.open-btn').addEventListener('click', e => { e.stopPropagation(); openTree(id); });
+        card.querySelector('.rename-btn').addEventListener('click', e => { e.stopPropagation(); openRenameModal(id); });
         card.querySelector('.del-btn').addEventListener('click', e => { e.stopPropagation(); deleteTree(id); });
         grid.appendChild(card);
     });
@@ -1026,6 +1032,37 @@ function createNewTree() {
     openTree(id);
 }
 
+// Rename Tree Setup
+let editingTreeId = null;
+
+function openRenameModal(id) {
+    editingTreeId = id;
+    const tree = trees[id];
+    document.getElementById('input-rename-tree').value = tree.name;
+    openModal('modal-rename-tree');
+    setTimeout(() => document.getElementById('input-rename-tree').focus(), 50);
+}
+
+document.getElementById('btn-rename-cancel').addEventListener('click', () => {
+    editingTreeId = null;
+    closeModal('modal-rename-tree');
+});
+
+document.getElementById('btn-rename-save').addEventListener('click', saveRenameTree);
+document.getElementById('input-rename-tree').addEventListener('keydown', e => { if (e.key === 'Enter') saveRenameTree(); });
+
+function saveRenameTree() {
+    if (!editingTreeId || !trees[editingTreeId]) return;
+    const newName = document.getElementById('input-rename-tree').value.trim();
+    if (!newName) { showToast(t('enterTreeName')); return; }
+    trees[editingTreeId].name = newName;
+    trees[editingTreeId].ts = Date.now(); // bump timestamp so it moves to top (optional)
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(trees));
+    closeModal('modal-rename-tree');
+    renderDashboard();
+    editingTreeId = null;
+}
+
 // Canvas header buttons
 document.getElementById('btn-back').addEventListener('click', () => {
     saveAll();
@@ -1056,7 +1093,7 @@ document.getElementById('btn-add-person').addEventListener('click', () => {
 // ======================== KEYBOARD SHORTCUTS ========================
 document.addEventListener('keydown', e => {
     if (e.key === 'Escape') {
-        closeModal('modal-new-tree'); closeModal('modal-add-person');
+        closeModal('modal-new-tree'); closeModal('modal-add-person'); closeModal('modal-rename-tree');
         deselectAll();
     }
     if ((e.key === 'Delete' || e.key === 'Backspace') && selectedNodeId && document.activeElement.tagName !== 'INPUT') {
