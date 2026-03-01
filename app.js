@@ -154,6 +154,12 @@ let drawingLine = null; // { fromNode, fromAnchor, startX, startY }
 let selectedNodeId = null;
 let selectedColor = GRADIENTS[0].id;
 
+let activePointers = new Map();
+let initialPinchDist = 0;
+let initialPinchZoom = 1;
+let initialPinchPan = { x: 0, y: 0 };
+let initialPinchCenter = { x: 0, y: 0 };
+
 // ======================== UTILITIES ========================
 function uid() { return Math.random().toString(36).slice(2, 10); }
 
@@ -634,87 +640,33 @@ function finishDrawLine(mx, my) {
 }
 
 // ======================== PAN & ZOOM ========================
-let activePointers = new Map();
-let initialPinchDistance = 0;
-let initialPinchZoom = 1;
-
 function setupCanvasInteraction() {
     const wrapper = document.getElementById('canvas-wrapper');
 
     wrapper.addEventListener('pointerdown', e => {
-        activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
-
         if (e.target === wrapper || e.target === canvasInner() || e.target === connSvg()) {
+            deselectAll();
+            activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
             if (activePointers.size === 1) {
-                deselectAll();
                 isPanning = true;
                 panStart = { x: e.clientX - pan.x, y: e.clientY - pan.y };
                 wrapper.style.cursor = 'grabbing';
+                wrapper.setPointerCapture(e.pointerId);
+            } else if (activePointers.size === 2) {
+                isPanning = false; // Disable single pan
+                const pts = Array.from(activePointers.values());
+                initialPinchDist = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y);
+                initialPinchZoom = zoom;
+                initialPinchPan = { ...pan };
+                const rect = wrapper.getBoundingClientRect();
+                initialPinchCenter = {
+                    x: (pts[0].x + pts[1].x) / 2 - rect.left,
+                    y: (pts[0].y + pts[1].y) / 2 - rect.top
+                };
             }
-            wrapper.setPointerCapture(e.pointerId);
             e.preventDefault();
         }
-    });
-
-    wrapper.addEventListener('pointermove', e => {
-        if (!activePointers.has(e.pointerId)) return;
-        activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
-
-        if (activePointers.size === 2) {
-            // Pinch-to-zoom logic
-            const pts = Array.from(activePointers.values());
-            const dist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
-
-            if (initialPinchDistance === 0) {
-                initialPinchDistance = dist;
-                initialPinchZoom = zoom;
-                isPanning = false; // Disable panning while pinching
-            } else {
-                const factor = dist / initialPinchDistance;
-                const newZoom = Math.min(4, Math.max(0.15, initialPinchZoom * factor));
-
-                // Zoom around the midpoint of the two fingers
-                const midX = (pts[0].x + pts[1].x) / 2;
-                const midY = (pts[0].y + pts[1].y) / 2;
-                const rect = wrapper.getBoundingClientRect();
-                const localX = midX - rect.left;
-                const localY = midY - rect.top;
-
-                pan.x = localX - (localX - pan.x) * (newZoom / zoom);
-                pan.y = localY - (localY - pan.y) * (newZoom / zoom);
-                zoom = newZoom;
-                applyTransform();
-            }
-        } else if (isPanning && activePointers.size === 1) {
-            pan.x = e.clientX - panStart.x;
-            pan.y = e.clientY - panStart.y;
-            applyTransform();
-        }
-
-        if (dragNode) { onMouseMoveNode(e); }
-        if (resizingNode) { onMouseMoveResize(e); }
-        if (drawingLine) { updateDraftLine(e.clientX, e.clientY); }
-    });
-
-    wrapper.addEventListener('pointerup', e => {
-        activePointers.delete(e.pointerId);
-        if (activePointers.size < 2) initialPinchDistance = 0;
-
-        if (isPanning) {
-            wrapper.style.cursor = 'default';
-            isPanning = false;
-            saveAll();
-        }
-        if (dragNode) { nodes[dragNode]; saveAll(); dragNode = null; }
-        if (resizingNode) { saveAll(); resizingNode = null; }
-        if (drawingLine) { finishDrawLine(e.clientX, e.clientY); }
-    });
-
-    wrapper.addEventListener('pointercancel', e => {
-        activePointers.delete(e.pointerId);
-        initialPinchDistance = 0;
-        isPanning = false;
-        wrapper.style.cursor = 'default';
     });
 
     wrapper.addEventListener('wheel', e => {
@@ -742,7 +694,82 @@ function setupCanvasInteraction() {
     });
 }
 
+// ======================== GLOBAL POINTER ========================
+document.addEventListener('pointermove', e => {
+    if (activePointers.has(e.pointerId)) {
+        activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    }
 
+    if (activePointers.size === 2 && initialPinchDist > 0) {
+        const pts = Array.from(activePointers.values());
+        const dist = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y);
+        const currentCenter = { x: (pts[0].x + pts[1].x) / 2, y: (pts[0].y + pts[1].y) / 2 };
+
+        const wrapper = document.getElementById('canvas-wrapper');
+        const rect = wrapper.getBoundingClientRect();
+        const cx = currentCenter.x - rect.left;
+        const cy = currentCenter.y - rect.top;
+
+        const factor = dist / initialPinchDist;
+        const newZoom = Math.min(4, Math.max(0.15, initialPinchZoom * factor));
+
+        const centerDx = cx - initialPinchCenter.x;
+        const centerDy = cy - initialPinchCenter.y;
+
+        pan.x = initialPinchPan.x + centerDx - (initialPinchCenter.x - initialPinchPan.x) * (newZoom / initialPinchZoom - 1);
+        pan.y = initialPinchPan.y + centerDy - (initialPinchCenter.y - initialPinchPan.y) * (newZoom / initialPinchZoom - 1);
+
+        zoom = newZoom;
+        applyTransform();
+        return;
+    }
+
+    if (isPanning && activePointers.size <= 1) {
+        pan.x = e.clientX - panStart.x;
+        pan.y = e.clientY - panStart.y;
+        applyTransform();
+    }
+    if (dragNode) { onMouseMoveNode(e); }
+    if (resizingNode) { onMouseMoveResize(e); }
+    if (drawingLine) { updateDraftLine(e.clientX, e.clientY); }
+});
+
+document.addEventListener('pointerup', e => {
+    if (activePointers.has(e.pointerId)) {
+        activePointers.delete(e.pointerId);
+        if (activePointers.size < 2) {
+            initialPinchDist = 0;
+            saveAll();
+        }
+        if (activePointers.size === 1) {
+            const remainingId = Array.from(activePointers.keys())[0];
+            const pt = activePointers.get(remainingId);
+            isPanning = true;
+            panStart = { x: pt.x - pan.x, y: pt.y - pan.y };
+        } else if (activePointers.size === 0) {
+            const wrapper = document.getElementById('canvas-wrapper');
+            if (wrapper) wrapper.style.cursor = 'default';
+            isPanning = false;
+        }
+    } else if (isPanning) {
+        const wrapper = document.getElementById('canvas-wrapper');
+        if (wrapper) wrapper.style.cursor = 'default';
+        isPanning = false;
+        saveAll();
+    }
+
+    if (dragNode) { nodes[dragNode]; saveAll(); dragNode = null; }
+    if (resizingNode) { saveAll(); resizingNode = null; }
+    if (drawingLine) { finishDrawLine(e.clientX, e.clientY); }
+});
+
+document.addEventListener('pointercancel', e => {
+    if (activePointers.has(e.pointerId)) {
+        activePointers.delete(e.pointerId);
+        initialPinchDist = 0;
+        if (activePointers.size === 0) isPanning = false;
+    }
+});
 
 // ======================== EDIT PERSON MODAL ========================
 let editingNodeId = null;
