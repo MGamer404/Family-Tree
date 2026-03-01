@@ -889,7 +889,6 @@ function checkShareImport() {
         trees[id] = {
             id, name: data.name + ' (imported)', ts: Date.now(),
             nodes: data.nodes || {}, lines: data.lines || {},
-            pan: data.pan || { x: 80, y: 80 }, zoom: data.zoom || 1,
             readonly: data.readonly === true
         };
         localStorage.setItem(STORAGE_KEY, JSON.stringify(trees));
@@ -921,7 +920,7 @@ function createNewTree() {
     const name = document.getElementById('input-tree-name').value.trim();
     if (!name) { showToast(t('enterTreeName')); return; }
     const id = uid();
-    trees[id] = { id, name, ts: Date.now(), nodes: {}, lines: {}, pan: { x: 80, y: 80 }, zoom: 1 };
+    trees[id] = { id, name, ts: Date.now(), nodes: {}, lines: {} };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(trees));
     closeModal('modal-new-tree');
     renderDashboard();
