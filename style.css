@@ -204,19 +204,6 @@ body {
     /* Point up to close */
 }
 
-position: relative;
-z-index: 10;
-display: flex;
-align-items: center;
-justify-content: space-between;
-padding: 0 40px;
-height: 68px;
-background: rgba(255, 255, 255, .85);
-backdrop-filter: blur(12px);
-border-bottom: 1.5px solid var(--border-light);
-box-shadow: var(--shadow-sm);
-}
-
 .dash-logo {
     display: flex;
     align-items: center;
@@ -344,19 +331,6 @@ box-shadow: var(--shadow-sm);
 
 .dash-empty.hidden {
     display: none;
-}
-
-/* ====== CANVAS HEADER ====== */
-.canvas-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0 24px;
-    height: 60px;
-    flex-shrink: 0;
-    border-bottom: 1.5px solid var(--border-light);
-    position: relative;
-    z-index: 100;
 }
 
 .glass {
