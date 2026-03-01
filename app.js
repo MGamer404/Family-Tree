@@ -668,6 +668,9 @@ function setupCanvasInteraction() {
     document.getElementById('btn-zoom-out').addEventListener('click', () => {
         zoom = Math.max(0.15, zoom / 1.15); applyTransform(); saveAll();
     });
+    document.getElementById('btn-center-view').addEventListener('click', () => {
+        autoCenterTree(); applyTransform(); saveAll();
+    });
 }
 
 // ======================== GLOBAL POINTER ========================
