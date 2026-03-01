@@ -31,7 +31,8 @@ const TRANSLATIONS = {
         shareOptionsTitle: 'Share Link', shareOptionsSub: 'Choose how people can interact with this shared tree.',
         shareEditable: 'Editable', shareEditableSub: 'Anyone with the link can edit the imported tree in their dashboard.',
         shareViewOnly: 'View-Only', shareViewOnlySub: 'People can only pan and zoom. They cannot add people, move nodes, or edit details.',
-        copyLink: 'Copy Link'
+        copyLink: 'Copy Link',
+        viewOnly: 'This shared tree is view-only.'
     },
     ar: {
         newTree: 'شجرة جديدة', addPerson: 'إضافة شخص', share: 'مشاركة',
@@ -58,9 +59,10 @@ const TRANSLATIONS = {
         langToggle: 'English',
         now: 'الآن',
         shareOptionsTitle: 'مشاركة الرابط', shareOptionsSub: 'اختر كيف يمكن للأشخاص التفاعل مع هذه الشجرة.',
-        shareEditable: 'قابل للتعديل', shareEditableSub: 'يمكن لأي شخص لديه الرابط استيراد وتعديل الشجرة.',
-        shareViewOnly: 'للعرض فقط', shareViewOnlySub: 'يمكن للأشخاص فقط التحريك والتكبير. لا يمكنهم تعديل أي تفاصيل.',
-        copyLink: 'نسخ الرابط'
+        shareEditable: 'قابل للتعديل', shareEditableSub: 'أي شخص لديه الرابط يمكنه تعديل الشجرة في لوحة التحكم الخاصة به.',
+        shareViewOnly: 'للقراءة فقط', shareViewOnlySub: 'يمكن للأشخاص فقط التكبير والتحريك. لا يمكنهم إضافة أشخاص أو نقل العقد.',
+        copyLink: 'نسخ الرابط',
+        viewOnly: 'هذه الشجرة المشتركة للقراءة فقط.'
     }
 };
 
@@ -403,12 +405,17 @@ function attachNodeEvents(el, id) {
         e.stopPropagation();
         el.setPointerCapture(e.pointerId);
         selectNode(id);
+
+        // Prevent dragging if read-only
+        if (trees[currentTreeId] && trees[currentTreeId].readonly) return;
+
         startDragNode(e, id);
     });
 
     // Resize handle
     el.querySelector('.resize-handle').addEventListener('pointerdown', e => {
         e.stopPropagation(); e.preventDefault();
+        if (trees[currentTreeId] && trees[currentTreeId].readonly) return;
         const n = nodes[id];
         resizingNode = id;
         resizeStart = { x: e.clientX, y: e.clientY, w: n.w, h: n.h };
@@ -418,12 +425,14 @@ function attachNodeEvents(el, id) {
     // Edit button
     el.querySelector('.edit-btn').addEventListener('click', e => {
         e.stopPropagation();
+        if (trees[currentTreeId] && trees[currentTreeId].readonly) return;
         openEditModal(id);
     });
 
     // Delete button
     el.querySelector('.del-btn').addEventListener('click', e => {
         e.stopPropagation();
+        if (trees[currentTreeId] && trees[currentTreeId].readonly) return;
         deleteNode(id);
         selectedNodeId = null;
     });
@@ -432,6 +441,7 @@ function attachNodeEvents(el, id) {
     el.querySelectorAll('.anchor').forEach(a => {
         a.addEventListener('pointerdown', e => {
             e.stopPropagation(); e.preventDefault();
+            if (trees[currentTreeId] && trees[currentTreeId].readonly) return;
             const side = a.dataset.side;
             const pos = anchorCenter(id, side);
             drawingLine = { fromNode: id, fromAnchor: side, startX: pos.x, startY: pos.y };
@@ -1032,6 +1042,10 @@ document.getElementById('btn-back').addEventListener('click', () => {
 });
 
 document.getElementById('btn-add-person').addEventListener('click', () => {
+    if (trees[currentTreeId] && trees[currentTreeId].readonly) {
+        showToast(t('viewOnly'));
+        return;
+    }
     editingNodeId = null;
     selectedColor = GRADIENTS[0].id;
     buildSwatches();
@@ -1054,6 +1068,7 @@ document.addEventListener('keydown', e => {
         deselectAll();
     }
     if ((e.key === 'Delete' || e.key === 'Backspace') && selectedNodeId && document.activeElement.tagName !== 'INPUT') {
+        if (trees[currentTreeId] && trees[currentTreeId].readonly) return;
         deleteNode(selectedNodeId); selectedNodeId = null;
     }
 });
