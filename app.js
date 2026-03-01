@@ -237,6 +237,10 @@ function openTree(id) {
     nodes = JSON.parse(JSON.stringify(tData.nodes || {}));
     lines = JSON.parse(JSON.stringify(tData.lines || {}));
     document.getElementById('canvas-view').classList.toggle('readonly-mode', !!tData.readonly);
+
+    // Hide header by default when opening a tree
+    document.querySelector('.canvas-header').classList.add('hidden');
+
     switchView('canvas-view');
     renderCanvas();
 
@@ -891,6 +895,11 @@ function checkShareImport() {
 // ======================== LANGUAGE TOGGLE ========================
 document.getElementById('btn-lang-dash').addEventListener('click', toggleLang);
 document.getElementById('btn-lang-canvas').addEventListener('click', toggleLang);
+
+// ======================== CANVAS HEADER TOGGLE ========================
+document.getElementById('btn-toggle-header').addEventListener('click', () => {
+    document.querySelector('.canvas-header').classList.toggle('hidden');
+});
 
 // ======================== DASHBOARD BUTTONS ========================
 document.getElementById('btn-new-tree').addEventListener('click', () => {

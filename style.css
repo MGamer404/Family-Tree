@@ -138,17 +138,83 @@ body {
 }
 
 .dash-header {
-    position: relative;
-    z-index: 10;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 40px;
+}
+
+/* ====== CANVAS HEADER ====== */
+.canvas-header {
+    height: 70px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0 40px;
-    height: 68px;
-    background: rgba(255, 255, 255, .85);
-    backdrop-filter: blur(12px);
-    border-bottom: 1.5px solid var(--border-light);
-    box-shadow: var(--shadow-sm);
+    padding: 0 24px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+    z-index: 100;
+    position: relative;
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.canvas-header.hidden {
+    transform: translateY(-100%);
+}
+
+.btn-toggle-header {
+    position: absolute;
+    top: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 40px;
+    height: 24px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 0 0 12px 12px;
+    border-top: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 99;
+    /* Below header, visually descending from it */
+    color: var(--text-secondary);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.btn-toggle-header:hover {
+    color: var(--accent);
+    background: var(--accent-light);
+}
+
+.btn-toggle-header svg {
+    transition: transform 0.3s;
+}
+
+.canvas-header:not(.hidden)~.btn-toggle-header {
+    top: 70px;
+    /* Pushed down when header is visible */
+}
+
+.canvas-header:not(.hidden)~.btn-toggle-header svg {
+    transform: rotate(180deg);
+    /* Point up to close */
+}
+
+position: relative;
+z-index: 10;
+display: flex;
+align-items: center;
+justify-content: space-between;
+padding: 0 40px;
+height: 68px;
+background: rgba(255, 255, 255, .85);
+backdrop-filter: blur(12px);
+border-bottom: 1.5px solid var(--border-light);
+box-shadow: var(--shadow-sm);
 }
 
 .dash-logo {
