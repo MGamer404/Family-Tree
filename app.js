@@ -17,7 +17,6 @@ const TRANSLATIONS = {
         cancel: 'Cancel', create: 'Create',
         addFamilyMember: 'Add Family Member', editFamilyMember: 'Edit Family Member',
         fullName: 'Full Name', fullNamePlaceholder: 'e.g. John Smith',
-        dateOfBirth: 'Date of Birth', dobPlaceholder: 'e.g. 12 Mar 1955',
         dateOfDeath: 'Date of Death', dodOptional: '(optional)',
         dodPlaceholder: 'Leave blank if alive',
         cardColor: 'Card Color', addToTree: 'Add to Tree', saveChanges: 'Save Changes',
@@ -47,7 +46,6 @@ const TRANSLATIONS = {
         cancel: 'إلغاء', create: 'إنشاء',
         addFamilyMember: 'إضافة فرد من العائلة', editFamilyMember: 'تعديل بيانات الفرد',
         fullName: 'الاسم الكامل', fullNamePlaceholder: 'مثال: محمد علي',
-        dateOfBirth: 'تاريخ الميلاد', dobPlaceholder: 'مثال: 12 مارس 1955',
         dateOfDeath: 'تاريخ الوفاة', dodOptional: '(اختياري)',
         dodPlaceholder: 'اتركه فارغاً إذا كان حياً',
         cardColor: 'لون البطاقة', addToTree: 'إضافة للشجرة', saveChanges: 'حفظ التغييرات',
@@ -329,7 +327,7 @@ function addNode(data) {
     const cy = (wrapper.clientHeight / 2 - pan.y) / zoom;
     const n = {
         id, name: data.name,
-        dob: data.dob || '', dod: data.dod || '',
+        dod: data.dod || '',
         x: cx - 90, y: cy - 60,
         w: 180, h: 120,
         gradient: data.gradient || GRADIENTS[0].id
@@ -345,9 +343,7 @@ function createNodeEl(n) {
     el.id = 'node-' + n.id;
     el.style.cssText = `left:${n.x}px;top:${n.y}px;width:${n.w}px;height:${n.h}px;`;
 
-    const dobStr = n.dob || '?';
-    const dodStr = n.dod ? n.dod : t('now');
-    const dateStr = `${dobStr} – ${dodStr}`;
+    const dateStr = n.dod || '';
 
     el.innerHTML = `
     <div class="node-body" style="background:${gradient(n.gradient)}">
@@ -377,9 +373,9 @@ function updateNodeEl(n) {
     el.style.width = n.w + 'px'; el.style.height = n.h + 'px';
     const body = el.querySelector('.node-body');
     body.style.background = gradient(n.gradient);
-    const dodStr = n.dod ? n.dod : t('now');
+    const dateStr = n.dod || '';
     el.querySelector('.node-name').textContent = n.name;
-    el.querySelector('.node-dates').textContent = `${n.dob || '?'} – ${dodStr}`;
+    el.querySelector('.node-dates').textContent = dateStr;
     refreshLines(n.id);
 }
 
@@ -788,8 +784,7 @@ function openEditModal(id) {
     editingNodeId = id;
     const n = nodes[id];
     document.getElementById('input-person-name').value = n.name;
-    document.getElementById('input-person-dob').value = n.dob;
-    document.getElementById('input-person-dod').value = n.dod;
+    document.getElementById('input-person-dod').value = n.dod || '';
     selectedColor = n.gradient;
     buildSwatches();
 
@@ -823,22 +818,20 @@ function buildSwatches() {
 document.getElementById('btn-person-add').addEventListener('click', () => {
     const name = document.getElementById('input-person-name').value.trim();
     if (!name) { showToast(t('enterName')); return; }
-    const dob = document.getElementById('input-person-dob').value.trim();
     const dod = document.getElementById('input-person-dod').value.trim();
 
     if (editingNodeId) {
         const n = nodes[editingNodeId];
-        n.name = name; n.dob = dob; n.dod = dod; n.gradient = selectedColor;
+        n.name = name; n.dod = dod; n.gradient = selectedColor;
         updateNodeEl(n); saveAll();
         editingNodeId = null;
     } else {
-        addNode({ name, dob, dod, gradient: selectedColor });
+        addNode({ name, dod, gradient: selectedColor });
     }
     closeModal('modal-add-person');
     document.getElementById('btn-person-add').dataset.i18n = 'addToTree';
     document.getElementById('btn-person-add').textContent = t('addToTree');
     document.getElementById('input-person-name').value = '';
-    document.getElementById('input-person-dob').value = '';
     document.getElementById('input-person-dod').value = '';
 });
 
@@ -897,7 +890,7 @@ document.getElementById('btn-share-copy').addEventListener('click', async () => 
     const payloadArray = [
         trees[currentTreeId].name,
         Object.values(nodes).map(n => [
-            n.id, n.name, n.dob, n.dod, Math.round(n.x), Math.round(n.y), Math.round(n.w), Math.round(n.h), GRADIENTS.findIndex(g => g.id === n.gradient)
+            n.id, n.name, '', n.dod, Math.round(n.x), Math.round(n.y), Math.round(n.w), Math.round(n.h), GRADIENTS.findIndex(g => g.id === n.gradient)
         ]),
         Object.values(lines).map(l => [
             l.id, l.fromNode, l.fromAnchor, l.toNode, l.toAnchor
@@ -965,7 +958,7 @@ async function checkShareImport() {
 
             parsed[1].forEach(n => {
                 importedNodes[n[0]] = {
-                    id: n[0], name: n[1], dob: n[2], dod: n[3],
+                    id: n[0], name: n[1], dod: n[3],
                     x: n[4], y: n[5], w: n[6], h: n[7],
                     gradient: GRADIENTS[n[8]] ? GRADIENTS[n[8]].id : GRADIENTS[0].id
                 };
@@ -1050,7 +1043,6 @@ document.getElementById('btn-add-person').addEventListener('click', () => {
     selectedColor = GRADIENTS[0].id;
     buildSwatches();
     document.getElementById('input-person-name').value = '';
-    document.getElementById('input-person-dob').value = '';
     document.getElementById('input-person-dod').value = '';
     const addBtn = document.getElementById('btn-person-add');
     addBtn.dataset.i18n = 'addToTree';
