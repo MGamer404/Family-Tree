@@ -138,7 +138,7 @@ let trees = {};          // { id: { name, nodes, lines, pan, zoom } }
 let currentTreeId = null;
 
 let pan = { x: 0, y: 0 };
-let zoom = 1;
+let zoom = 0.5;
 
 let nodes = {};  // { id: { id,name,dob,dod,x,y,w,h,gradient } }
 let lines = {};  // { id: { id,fromNode,fromAnchor,toNode,toAnchor } }
@@ -234,14 +234,52 @@ function openTree(id) {
     const tData = trees[id];
     nodes = JSON.parse(JSON.stringify(tData.nodes || {}));
     lines = JSON.parse(JSON.stringify(tData.lines || {}));
-    pan = tData.pan ? { ...tData.pan } : { x: 80, y: 80 };
-    zoom = tData.zoom || 1;
-
-    document.getElementById('tree-name-display').textContent = tData.name;
     document.getElementById('canvas-view').classList.toggle('readonly-mode', !!tData.readonly);
     switchView('canvas-view');
     renderCanvas();
+
+    if (tData.pan && tData.zoom) {
+        pan = { ...tData.pan };
+        zoom = tData.zoom;
+    } else {
+        autoCenterTree();
+    }
+
     applyTransform();
+}
+
+function autoCenterTree() {
+    const ns = Object.values(nodes);
+    const wrapper = document.getElementById('canvas-wrapper');
+    if (!wrapper) return;
+
+    const w = wrapper.clientWidth;
+    const h = wrapper.clientHeight;
+
+    if (ns.length === 0) {
+        pan = { x: w / 2, y: h / 2 };
+        zoom = 0.5;
+        return;
+    }
+
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    ns.forEach(n => {
+        minX = Math.min(minX, n.x); minY = Math.min(minY, n.y);
+        maxX = Math.max(maxX, n.x + n.w); maxY = Math.max(maxY, n.y + n.h);
+    });
+
+    const treeW = maxX - minX;
+    const treeH = maxY - minY;
+
+    // Use default zoom 0.5 or fit if tree is very large
+    zoom = 0.5;
+    const padding = 40;
+    if (treeW * zoom > w - padding || treeH * zoom > h - padding) {
+        zoom = Math.min((w - padding) / treeW, (h - padding) / treeH, 0.5);
+    }
+
+    pan.x = (w / 2) - (minX + treeW / 2) * zoom;
+    pan.y = (h / 2) - (minY + treeH / 2) * zoom;
 }
 
 function switchView(id) {
