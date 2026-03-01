@@ -674,7 +674,41 @@ function setupCanvasInteraction() {
 }
 
 // ======================== GLOBAL POINTER ========================
+let activePointers = new Map();
+let initialPinchDistance = 0;
+let initialPinchZoom = 1;
+
 document.addEventListener('pointermove', e => {
+    activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+    if (activePointers.size === 2) {
+        // Pinch-to-zoom logic
+        const pts = Array.from(activePointers.values());
+        const dist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+
+        if (initialPinchDistance === 0) {
+            initialPinchDistance = dist;
+            initialPinchZoom = zoom;
+        } else {
+            const factor = dist / initialPinchDistance;
+            const newZoom = Math.min(4, Math.max(0.15, initialPinchZoom * factor));
+
+            // Zoom around the midpoint of the two fingers
+            const midX = (pts[0].x + pts[1].x) / 2;
+            const midY = (pts[0].y + pts[1].y) / 2;
+            const wrapper = document.getElementById('canvas-wrapper');
+            const rect = wrapper.getBoundingClientRect();
+            const localX = midX - rect.left;
+            const localY = midY - rect.top;
+
+            pan.x = localX - (localX - pan.x) * (newZoom / zoom);
+            pan.y = localY - (localY - pan.y) * (newZoom / zoom);
+            zoom = newZoom;
+            applyTransform();
+        }
+        return;
+    }
+
     if (isPanning) {
         pan.x = e.clientX - panStart.x;
         pan.y = e.clientY - panStart.y;
@@ -686,6 +720,11 @@ document.addEventListener('pointermove', e => {
 });
 
 document.addEventListener('pointerup', e => {
+    activePointers.delete(e.pointerId);
+    if (activePointers.size < 2) {
+        initialPinchDistance = 0;
+    }
+
     if (isPanning) {
         document.getElementById('canvas-wrapper').style.cursor = 'default';
         isPanning = false;
@@ -694,6 +733,11 @@ document.addEventListener('pointerup', e => {
     if (dragNode) { nodes[dragNode]; saveAll(); dragNode = null; }
     if (resizingNode) { saveAll(); resizingNode = null; }
     if (drawingLine) { finishDrawLine(e.clientX, e.clientY); }
+});
+
+document.addEventListener('pointercancel', e => {
+    activePointers.delete(e.pointerId);
+    initialPinchDistance = 0;
 });
 
 // ======================== EDIT PERSON MODAL ========================
