@@ -848,46 +848,146 @@ document.getElementById('btn-share-cancel').addEventListener('click', () => {
     closeModal('modal-share');
 });
 
-document.getElementById('btn-share-copy').addEventListener('click', () => {
+// ======================== COMPRESSION HELPERS ========================
+async function compressData(str) {
+    const stream = new Blob([str]).stream().pipeThrough(new CompressionStream('deflate'));
+    const response = new Response(stream);
+    return await response.arrayBuffer();
+}
+
+async function decompressData(buffer) {
+    const stream = new Blob([buffer]).stream().pipeThrough(new DecompressionStream('deflate'));
+    const response = new Response(stream);
+    return await response.text();
+}
+
+function bufferToBase64(buffer) {
+    let binary = '';
+    const bytes = new Uint8Array(buffer);
+    for (let i = 0; i < bytes.byteLength; i++) {
+        binary += String.fromCharCode(bytes[i]);
+    }
+    return btoa(binary);
+}
+
+function base64ToBuffer(base64) {
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+        bytes[i] = binary.charCodeAt(i);
+    }
+    return bytes.buffer;
+}
+
+document.getElementById('btn-share-copy').addEventListener('click', async () => {
     saveAll();
     const isReadonly = document.querySelector('input[name="share-type"]:checked').value === 'viewonly';
 
-    // Create export payload
-    const payload = JSON.stringify({
-        name: trees[currentTreeId].name,
-        nodes, lines, pan, zoom,
-        readonly: isReadonly
-    });
+    // Dense Array Serialization for Share 3
+    const payloadArray = [
+        trees[currentTreeId].name,
+        Object.values(nodes).map(n => [
+            n.id, n.name, n.dob, n.dod, Math.round(n.x), Math.round(n.y), Math.round(n.w), Math.round(n.h), GRADIENTS.findIndex(g => g.id === n.gradient)
+        ]),
+        Object.values(lines).map(l => [
+            l.id, l.fromNode, l.fromAnchor, l.toNode, l.toAnchor
+        ]),
+        Math.round(pan.x), Math.round(pan.y),
+        Number(zoom.toFixed(2)),
+        isReadonly ? 1 : 0
+    ];
 
-    const b64 = btoa(unescape(encodeURIComponent(payload)));
-    const url = location.href.split('#')[0] + '#share=' + b64;
-    navigator.clipboard.writeText(url).then(() => showToast(t('shareCopied')))
-        .catch(() => prompt('Copy this link:', url));
+    const payload = JSON.stringify(payloadArray);
+
+    try {
+        const compressedBuffer = await compressData(payload);
+        const b64 = bufferToBase64(compressedBuffer);
+        const url = location.href.split('#')[0] + '#share3=' + b64;
+        await navigator.clipboard.writeText(url);
+        showToast(t('shareCopied'));
+    } catch (e) {
+        console.error("Compression failed:", e);
+        // Fallback
+        const fallbackPayload = JSON.stringify({
+            name: trees[currentTreeId].name,
+            nodes, lines, pan, zoom,
+            readonly: isReadonly
+        });
+        const b64 = btoa(unescape(encodeURIComponent(fallbackPayload)));
+        const url = location.href.split('#')[0] + '#share=' + b64;
+        navigator.clipboard.writeText(url).then(() => showToast(t('shareCopied'))).catch(() => prompt('Copy this link:', url));
+    }
 
     closeModal('modal-share');
 });
 
 
 // ======================== SHARE IMPORT ON LOAD ========================
-function checkShareImport() {
+async function checkShareImport() {
     const hash = location.hash;
-    if (!hash.startsWith('#share=')) return;
+    if (!hash.startsWith('#share=') && !hash.startsWith('#share2=') && !hash.startsWith('#share3=')) return;
+
     try {
-        const b64 = hash.slice(7);
-        const json = decodeURIComponent(escape(atob(b64)));
-        const data = JSON.parse(json);
+        let json = '';
+        if (hash.startsWith('#share3=')) {
+            const b64 = hash.slice(8);
+            const buffer = base64ToBuffer(b64);
+            json = await decompressData(buffer);
+        } else if (hash.startsWith('#share2=')) {
+            const b64 = hash.slice(8);
+            const buffer = base64ToBuffer(b64);
+            json = await decompressData(buffer);
+        } else {
+            const b64 = hash.slice(7);
+            json = decodeURIComponent(escape(atob(b64)));
+        }
+
+        const parsed = JSON.parse(json);
         const id = uid();
+        let name = "Imported Tree";
+        let importedNodes = {};
+        let importedLines = {};
+        let readonly = false;
+
+        if (hash.startsWith('#share3=')) {
+            // Rehydrate deeply minified array structure
+            name = parsed[0];
+
+            parsed[1].forEach(n => {
+                importedNodes[n[0]] = {
+                    id: n[0], name: n[1], dob: n[2], dod: n[3],
+                    x: n[4], y: n[5], w: n[6], h: n[7],
+                    gradient: GRADIENTS[n[8]] ? GRADIENTS[n[8]].id : GRADIENTS[0].id
+                };
+            });
+
+            parsed[2].forEach(l => {
+                importedLines[l[0]] = {
+                    id: l[0], fromNode: l[1], fromAnchor: l[2], toNode: l[3], toAnchor: l[4]
+                };
+            });
+
+            readonly = parsed[6] === 1;
+        } else {
+            // Rehydrate objects
+            name = parsed.name;
+            importedNodes = parsed.nodes || {};
+            importedLines = parsed.lines || {};
+            readonly = parsed.readonly === true;
+        }
+
         trees[id] = {
-            id, name: data.name + ' (imported)', ts: Date.now(),
-            nodes: data.nodes || {}, lines: data.lines || {},
-            readonly: data.readonly === true
+            id, name: name + ' (imported)', ts: Date.now(),
+            nodes: importedNodes, lines: importedLines,
+            readonly: readonly
         };
         localStorage.setItem(STORAGE_KEY, JSON.stringify(trees));
         history.replaceState(null, '', location.pathname);
-        showToast(t('imported', data.name));
+        showToast(t('imported', name));
         renderDashboard();
         openTree(id);
     } catch (e) {
+        console.error("Import failed:", e);
         showToast(t('importFailed'));
     }
 }
